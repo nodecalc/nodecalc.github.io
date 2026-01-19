@@ -1,5 +1,5 @@
-// price-logic.js — Standalone Pi Price + Real Chart + Wallet Operations Dots (Jan 2025+)
-// For https://nodecalc.github.io/price.html
+// price-logic.js — Standalone Pi Price + Real Chart + Wallet Operations Dots
+// Updated x-axis labels as requested
 
 let TF = 'D';           // default: Day view (last 7 days)
 let pricePts = [];      // [{t: ms timestamp, c: price}]
@@ -18,32 +18,36 @@ const msg   = document.getElementById('msg');
 function resize() {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = canvas.clientWidth * dpr;
-  canvas.height = 340 * dpr;
+  canvas.height = 360 * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 window.addEventListener('resize', () => { resize(); draw(); });
 
-// 1. Real current price + 24h change (CoinGecko)
+// 1. Load current price + 24h change + 24h volume (CoinGecko markets endpoint)
 async function loadPrice() {
   try {
-    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=pi-network&vs_currencies=usd&include_24hr_change=true');
+    const r = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=pi-network&order=market_cap_desc&per_page=1&page=1&sparkline=false&price_change_percentage=24h');
     const j = await r.json();
-    const data = j['pi-network'];
+    const data = j[0]; // First (and only) result
+
     if (data) {
-      const price = data.usd;
-      const change = data.usd_24h_change || 0;
+      const price = data.current_price || 0;
+      const change = data.price_change_percentage_24h || 0;
+      const volume = data.total_volume || 0;
+
       elUSD.textContent = price.toFixed(4);
       elCHG.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
       elCHG.className = 'pill ' + (change >= 0 ? 'good' : 'bad');
-      elVOL.textContent = '—';
+      elVOL.textContent = '$' + volume.toLocaleString(undefined, { maximumFractionDigits: 0 }); // formatted like $1,234,567
       elTS.textContent = new Date().toLocaleTimeString();
     }
   } catch (e) {
     elTS.textContent = 'price feed unavailable';
+    console.error('Price load error:', e);
   }
 }
 
-// 2. Real historical prices for chart (CoinGecko daily closes)
+// 2. Load historical prices (CoinGecko)
 async function loadHistory(days = 7) {
   try {
     const r = await fetch(`https://api.coingecko.com/api/v3/coins/pi-network/market_chart?vs_currency=usd&days=${days}&interval=daily`);
@@ -57,7 +61,7 @@ async function loadHistory(days = 7) {
   }
 }
 
-// 3. Fetch wallet operations with pagination — only from Jan 1, 2025 onward
+// 3. Fetch wallet operations (Jan 2025+ only)
 async function loadWalletOperations(acct) {
   msg.textContent = 'Loading wallet operations (from Jan 2025)...';
   operations = [];
@@ -105,19 +109,25 @@ async function loadWalletOperations(acct) {
   }
 }
 
-// Helper: Get ISO week number
+// Helper: ISO week number
 function getISOWeek(date) {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
+  d.setHours(0,0,0,0);
   d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
   const week1 = new Date(d.getFullYear(), 0, 4);
   return 1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
 }
 
+// Helper: Get month-end day label
+function getMonthEndLabel(date) {
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  return date.toLocaleString(undefined, { month: 'short' }) + ' ' + lastDay;
+}
+
 // Chart drawing
 function computeBounds(pts) {
   const w = canvas.clientWidth, h = canvas.clientHeight;
-  const m = { left: 56, right: 10, top: 10, bottom: 60 }; // Increased bottom margin for labels
+  const m = { left: 56, right: 10, top: 10, bottom: 60 }; // Extra bottom for labels
   const xs = pts.map(p => p.t), ys = pts.map(p => p.c);
   let xmin = Math.min(...xs), xmax = Math.max(...xs);
   let ymin = Math.min(...ys), ymax = Math.max(...ys);
@@ -151,19 +161,26 @@ function drawAxes(b) {
     ctx.beginPath(); ctx.moveTo(x, h - m.bottom); ctx.lineTo(x, h - m.bottom + 4); ctx.stroke();
 
     const date = new Date(t);
-    let label;
+    let label = '';
+
     if (TF === 'D') {
-      label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); // Jan 16
+      // Last 7 days: actual dates
+      label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     } else if (TF === 'W') {
-      label = 'Wk ' + getISOWeek(date); // Week 1,2,3,...
+      // Last 7 weeks: week numbers (current week is highest)
+      const weekNum = getISOWeek(date);
+      label = 'Wk ' + weekNum;
     } else if (TF === 'M') {
-      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-      label = date.toLocaleString(undefined, { month: 'short' }) + ' ' + lastDay; // Jan 31
+      // Last 7 months: month names only (Nov, Dec, Jan, etc.)
+      label = date.toLocaleString(undefined, { month: 'short' });
     } else if (TF === 'Y') {
-      label = date.toLocaleString(undefined, { month: 'short' }); // Jan, Feb,...
+      // Last 12 months: month names
+      label = date.toLocaleString(undefined, { month: 'short' });
     } else { // All
-      label = date.getFullYear(); // 2025, 2026,...
+      // Years only
+      label = date.getFullYear();
     }
+
     ctx.fillText(label, x, h - m.bottom + 6);
   }
 }
@@ -227,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
   resize();
 
   loadPrice();
-  loadHistory(7); // Default: Day = last 7 days
+  loadHistory(7); // Day = last 7 days
 
   // Timeframe buttons
   document.querySelectorAll('.tabs .btn').forEach(btn => {
@@ -240,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Set Day button active on load
+  // Set Day active on load
   document.querySelector('.tabs .btn[data-tf="D"]').classList.add('active');
 
   // Load Wallet button
@@ -252,4 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     loadWalletOperations(acct);
   };
+
+  // Auto-refresh price & volume every 60 seconds
+  setInterval(loadPrice, 60000);
 });
