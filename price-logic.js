@@ -1,7 +1,7 @@
 // price-logic.js — Standalone Pi Price + Real Chart + Wallet Operations Dots (Jan 2025+)
 // For https://nodecalc.github.io/price.html
 
-let TF = 'M';           // default: M for Month view
+let TF = 'D';           // default: Day view (last 7 days)
 let pricePts = [];      // [{t: ms timestamp, c: price}]
 let operations = [];    // filtered Pi operations from Jan 2025 onward
 
@@ -18,7 +18,7 @@ const msg   = document.getElementById('msg');
 function resize() {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = canvas.clientWidth * dpr;
-  canvas.height = 300 * dpr;
+  canvas.height = 340 * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 window.addEventListener('resize', () => { resize(); draw(); });
@@ -44,7 +44,7 @@ async function loadPrice() {
 }
 
 // 2. Real historical prices for chart (CoinGecko daily closes)
-async function loadHistory(days = 365) {
+async function loadHistory(days = 7) {
   try {
     const r = await fetch(`https://api.coingecko.com/api/v3/coins/pi-network/market_chart?vs_currency=usd&days=${days}&interval=daily`);
     const j = await r.json();
@@ -62,11 +62,11 @@ async function loadWalletOperations(acct) {
   msg.textContent = 'Loading wallet operations (from Jan 2025)...';
   operations = [];
 
-  const cutoffDate = new Date('2025-01-01T00:00:00Z').getTime(); // Jan 1, 2025 UTC
+  const cutoffDate = new Date('2025-01-01T00:00:00Z').getTime();
 
   let url = `https://api.mainnet.minepi.com/accounts/${acct}/operations?limit=200&order=desc`;
   let totalFetched = 0;
-  const maxOps = 2000; // safety cap
+  const maxOps = 2000;
 
   try {
     while (url && totalFetched < maxOps) {
@@ -75,7 +75,6 @@ async function loadWalletOperations(acct) {
 
       if (!j._embedded?.records?.length) break;
 
-      // Filter only Pi-native relevant ops AFTER Jan 1, 2025
       const relevant = j._embedded.records.filter(op => {
         const opTime = new Date(op.created_at).getTime();
         return (
@@ -88,11 +87,9 @@ async function loadWalletOperations(acct) {
       operations.push(...relevant);
       totalFetched += relevant.length;
 
-      // Next page cursor
       url = j._links.next?.href || null;
     }
 
-    // Classify direction for dot color
     operations.forEach(op => {
       op.dir = 'self';
       if (op.from === acct && op.to !== acct) op.dir = 'out';
@@ -100,7 +97,7 @@ async function loadWalletOperations(acct) {
     });
 
     msg.textContent = `Loaded ${operations.length} relevant Pi operations (from Jan 2025) → dots on chart`;
-    draw(); // redraw with dots
+    draw();
 
   } catch (e) {
     msg.textContent = 'Failed to load (check address or network)';
@@ -120,7 +117,7 @@ function getISOWeek(date) {
 // Chart drawing
 function computeBounds(pts) {
   const w = canvas.clientWidth, h = canvas.clientHeight;
-  const m = { left: 56, right: 10, top: 10, bottom: 28 };
+  const m = { left: 56, right: 10, top: 10, bottom: 60 }; // Increased bottom margin for labels
   const xs = pts.map(p => p.t), ys = pts.map(p => p.c);
   let xmin = Math.min(...xs), xmax = Math.max(...xs);
   let ymin = Math.min(...ys), ymax = Math.max(...ys);
@@ -145,8 +142,9 @@ function drawAxes(b) {
     ctx.beginPath(); ctx.moveTo(m.left, y); ctx.lineTo(w - m.right, y); ctx.stroke();
     ctx.fillText('$' + v.toFixed(4), m.left - 6, y);
   }
+
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  const xTicks = 7; // Last 7 intervals for day/week/month
+  const xTicks = 6;
   for (let i = 0; i <= xTicks; i++) {
     const t = xmin + (i * (xmax - xmin)) / xTicks;
     const x = xp(t);
@@ -157,15 +155,14 @@ function drawAxes(b) {
     if (TF === 'D') {
       label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); // Jan 16
     } else if (TF === 'W') {
-      label = 'Wk ' + getISOWeek(date); // Week 1,2,3,...,52
+      label = 'Wk ' + getISOWeek(date); // Week 1,2,3,...
     } else if (TF === 'M') {
-      // End of month dates
       const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
       label = date.toLocaleString(undefined, { month: 'short' }) + ' ' + lastDay; // Jan 31
     } else if (TF === 'Y') {
-      label = date.toLocaleString(undefined, { month: 'short' }); // Jan, Feb, etc.
-    } else { // A (All)
-      label = date.getFullYear(); // 2025, 2026, etc.
+      label = date.toLocaleString(undefined, { month: 'short' }); // Jan, Feb,...
+    } else { // All
+      label = date.getFullYear(); // 2025, 2026,...
     }
     ctx.fillText(label, x, h - m.bottom + 6);
   }
@@ -180,7 +177,6 @@ function drawLine(pts, b) {
   ctx.stroke();
 }
 
-// Plot dots for operations within chart timeframe
 function drawTxDots(b) {
   if (!operations.length || !pricePts.length) return;
 
@@ -200,33 +196,22 @@ function drawTxDots(b) {
   operations.forEach(op => {
     if (!op.created_at) return;
     const t = new Date(op.created_at).getTime();
-    if (t < chartMinT || t > chartMaxT) return; // only show in current timeframe
+    if (t < chartMinT || t > chartMaxT) return;
 
     const i = nearestIdx(t);
     const px = b.xp(pricePts[i].t);
     const py = b.yp(pricePts[i].c);
 
-    // Color logic
-    let color;
-    if (op.dir === 'in') {
-      color = '#58b86a';      // green = incoming
-    } else if (op.dir === 'out') {
-      color = '#e15759';      // red = outgoing
-    } else {
-      color = '#facc15';      // yellow = self-send (from === to)
-    }
+    let color = '#facc15'; // yellow self
+    if (op.dir === 'in')  color = '#58b86a';
+    if (op.dir === 'out') color = '#e15759';
 
     ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(px, py, 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Black outline for better visibility on any background
-    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
   });
 }
+
 function draw() {
   resize();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -237,26 +222,28 @@ function draw() {
   drawTxDots(b);
 }
 
-// Init & event listeners
+// Init
 document.addEventListener('DOMContentLoaded', () => {
   resize();
 
   loadPrice();
-  loadHistory(365); // default to last year
+  loadHistory(7); // Default: Day = last 7 days
 
-  // Timeframe buttons — update days based on last 7 intervals
+  // Timeframe buttons
   document.querySelectorAll('.tabs .btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tabs .btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      const map = { D:7, W:49, M:210, Y:365, A:'max' }; // D=last 7 days, W=last 7 weeks, M=last 7 months (~210 days), Y=last year, A=all
-      const days = map[btn.dataset.tf] || 365;
-      TF = btn.dataset.tf;
+      const map = { D:7, W:49, M:210, Y:365, A:'max' };
+      const days = map[btn.dataset.tf] || 7;
       loadHistory(days);
     });
   });
 
-  // Load wallet operations button
+  // Set Day button active on load
+  document.querySelector('.tabs .btn[data-tf="D"]').classList.add('active');
+
+  // Load Wallet button
   document.getElementById('btnLoadTx').onclick = () => {
     const acct = document.getElementById('acct').value.trim().toUpperCase();
     if (!/^G[2-7A-Z0-9]{55}$/.test(acct)) {
