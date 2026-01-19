@@ -152,16 +152,18 @@
 
     .chart-container {
       position: relative;
-      margin-bottom: 40px;
-      padding-bottom: 50px; /* extra space for x-axis labels on mobile */
+      margin-bottom: 60px; /* Increased for label space */
+      padding-bottom: 80px; /* Extra buffer for x-axis on mobile */
+      overflow: visible;
     }
 
     canvas {
       width: 100%;
-      height: 340px;
-      min-height: 280px;
+      height: 360px; /* Slightly taller for better label visibility */
+      min-height: 300px;
       border-radius: 8px;
       background: white;
+      display: block;
     }
 
     .axisNote {
@@ -170,13 +172,16 @@
       font-size: 13px;
       display: flex;
       flex-wrap: wrap;
-      gap: 16px 24px;
+      gap: 20px 32px; /* Better spacing */
       justify-content: center;
       text-align: center;
+      line-height: 1.5;
     }
 
-    .axisNote > span {
+    .axisNote span {
       white-space: nowrap;
+      display: flex;
+      align-items: center;
     }
 
     .badge {
@@ -194,9 +199,9 @@
 
     .inputRow {
       display: flex;
+      flex-wrap: wrap;
       gap: 12px;
       margin-top: 16px;
-      flex-wrap: wrap;
       align-items: center;
     }
 
@@ -227,11 +232,17 @@
     /* Mobile-specific fixes */
     @media (max-width: 480px) {
       .chart-container {
-        padding-bottom: 60px; /* more space for x-labels */
+        padding-bottom: 100px; /* Even more space for x-labels */
+        margin-bottom: 20px;
       }
 
       canvas {
-        height: 300px; /* slightly shorter on tiny phones */
+        height: 320px; /* Balanced for phones */
+      }
+
+      .axisNote {
+        flex-direction: column;
+        gap: 12px;
       }
 
       .inputRow {
@@ -239,22 +250,14 @@
         align-items: stretch;
       }
 
-      .inputRow input {
-        min-width: 100%;
+      .inputRow input,
+      .inputRow button.btn {
+        width: 100%;
+        min-width: unset;
       }
 
       .inputRow button.btn {
-        width: 100%;
         padding: 14px;
-      }
-
-      .axisNote {
-        flex-direction: column;
-        gap: 10px;
-      }
-
-      .axisNote > span {
-        text-align: center;
       }
     }
   </style>
@@ -311,7 +314,7 @@
 
       <div class="axisNote">
         <span class="muted">Left axis: USD • Bottom: date</span>
-        <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center;">
+        <div style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center;">
           <span><span class="badge in"></span> incoming</span>
           <span><span class="badge out"></span> outgoing</span>
           <span><span class="badge self"></span> self-send</span>
