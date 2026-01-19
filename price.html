@@ -65,7 +65,7 @@
       border: 1px solid var(--pi-border);
       border-radius: 14px;
       margin-bottom: 20px;
-      overflow: hidden;
+      overflow: visible; /* Changed from hidden to prevent clipping */
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
@@ -152,14 +152,14 @@
 
     .chart-container {
       position: relative;
-      margin-bottom: 60px; /* Increased for label space */
-      padding-bottom: 80px; /* Extra buffer for x-axis on mobile */
+      margin-bottom: 80px; /* Increased for mobile label space */
+      padding-bottom: 80px; /* Critical: reserves space for x-axis labels */
       overflow: visible;
     }
 
     canvas {
       width: 100%;
-      height: 360px; /* Slightly taller for better label visibility */
+      height: 360px;
       min-height: 300px;
       border-radius: 8px;
       background: white;
@@ -172,10 +172,9 @@
       font-size: 13px;
       display: flex;
       flex-wrap: wrap;
-      gap: 20px 32px; /* Better spacing */
+      gap: 16px 24px;
       justify-content: center;
       text-align: center;
-      line-height: 1.5;
     }
 
     .axisNote span {
@@ -199,9 +198,9 @@
 
     .inputRow {
       display: flex;
-      flex-wrap: wrap;
       gap: 12px;
       margin-top: 16px;
+      flex-wrap: wrap;
       align-items: center;
     }
 
@@ -232,12 +231,12 @@
     /* Mobile-specific fixes */
     @media (max-width: 480px) {
       .chart-container {
-        padding-bottom: 100px; /* Even more space for x-labels */
-        margin-bottom: 20px;
+        padding-bottom: 120px; /* Even more space for x-labels on mobile */
+        margin-bottom: 40px;
       }
 
       canvas {
-        height: 320px; /* Balanced for phones */
+        height: 320px; /* Balanced height */
       }
 
       .axisNote {
@@ -253,7 +252,6 @@
       .inputRow input,
       .inputRow button.btn {
         width: 100%;
-        min-width: unset;
       }
 
       .inputRow button.btn {
@@ -314,7 +312,7 @@
 
       <div class="axisNote">
         <span class="muted">Left axis: USD • Bottom: date</span>
-        <div style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center;">
+        <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center;">
           <span><span class="badge in"></span> incoming</span>
           <span><span class="badge out"></span> outgoing</span>
           <span><span class="badge self"></span> self-send</span>
