@@ -132,6 +132,7 @@
       border: 1px solid var(--pi-border);
       border-radius: 10px;
       font-size: 15px;
+      box-sizing: border-box;
     }
 
     button.btn {
@@ -142,6 +143,7 @@
       border-radius: 10px;
       cursor: pointer;
       font-weight: 600;
+      white-space: nowrap;
     }
 
     button.btn:hover {
@@ -151,12 +153,12 @@
     .chart-container {
       position: relative;
       margin-bottom: 40px;
-      padding-bottom: 30px; /* extra space for x-axis labels on mobile */
+      padding-bottom: 50px; /* extra space for x-axis labels on mobile */
     }
 
     canvas {
       width: 100%;
-      height: 340px; /* taller for better visibility */
+      height: 340px;
       min-height: 280px;
       border-radius: 8px;
       background: white;
@@ -195,11 +197,7 @@
       gap: 12px;
       margin-top: 16px;
       flex-wrap: wrap;
-    }
-
-    .inputRow input {
-      flex: 1;
-      min-width: 260px;
+      align-items: center;
     }
 
     footer {
@@ -226,24 +224,37 @@
       background: var(--pi-purple-dark);
     }
 
-    /* Mobile fixes */
+    /* Mobile-specific fixes */
     @media (max-width: 480px) {
       .chart-container {
-        padding-bottom: 50px; /* more space for x-labels */
+        padding-bottom: 60px; /* more space for x-labels */
       }
+
       canvas {
-        height: 300px; /* slightly shorter on small phones */
+        height: 300px; /* slightly shorter on tiny phones */
       }
+
+      .inputRow {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .inputRow input {
+        min-width: 100%;
+      }
+
+      .inputRow button.btn {
+        width: 100%;
+        padding: 14px;
+      }
+
       .axisNote {
         flex-direction: column;
         gap: 10px;
       }
-      .inputRow {
-        flex-direction: column;
-        gap: 12px;
-      }
-      .inputRow input {
-        min-width: 100%;
+
+      .axisNote > span {
+        text-align: center;
       }
     }
   </style>
